@@ -1,0 +1,93 @@
+name: cdm26
+description: World Cup 2026 Fantasy Pool App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.11.4 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.4
+  cloud_firestore: ^5.6.8
+  firebase_storage: ^12.4.5
+  firebase_messaging: ^15.2.5
+  firebase_analytics: ^11.4.5
+
+  # Auth providers
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.4
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^15.1.2
+
+  # Data / serialization
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
+  # Networking
+  dio: ^5.8.0+1
+
+  # Local storage
+  shared_preferences: ^2.3.5
+  flutter_secure_storage: ^9.2.4
+
+  # UI utilities
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+  lottie: ^3.3.1
+  fl_chart: ^0.71.0
+  intl: ^0.20.2
+  timeago: ^3.7.0
+
+  # Env / config
+  flutter_dotenv: ^5.2.1
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
+  # Image picker
+  image_picker: ^1.1.2
+
+  # Utils
+  uuid: ^4.5.1
+  collection: ^1.19.1
+  equatable: ^2.0.7
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.15
+  freezed: ^3.0.0
+  json_serializable: ^6.9.4
+  riverpod_generator: ^2.6.5
+  custom_lint: ^0.7.5
+  riverpod_lint: ^2.6.5
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: "assets/icon/app_icon.png"
+  ios_content_mode: scaleAspectFill
+  remove_alpha_ios: true
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
+    - assets/animations/
+    - assets/icons/

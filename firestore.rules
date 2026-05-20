@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    function isLeagueMember(leagueId) {
+      return isAuth() &&
+        exists(/databases/$(database)/documents/leagues/$(leagueId)/members/$(request.auth.uid));
+    }
+
+    function isLeagueAdmin(leagueId) {
+      return isAuth() &&
+        request.auth.uid in get(/databases/$(database)/documents/leagues/$(leagueId)).data.adminUserIds;
+    }
+
+    function isLeagueOwner(leagueId) {
+      return isAuth() &&
+        request.auth.uid == get(/databases/$(database)/documents/leagues/$(leagueId)).data.ownerUserId;
+    }
+
+    // ─── Users ─────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow create: if isUser(userId);
+      allow update: if isUser(userId);
+      allow delete: if isUser(userId);
+    }
+
+    // ─── Tournaments ────────────────────────────────────────────────────────
+    match /tournaments/{tournamentId} {
+      allow read: if isAuth();
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ─── Teams ──────────────────────────────────────────────────────────────
+    match /teams/{teamId} {
+      allow read: if isAuth();
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ─── Players ────────────────────────────────────────────────────────────
+    match /players/{playerId} {
+      allow read: if isAuth();
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ─── Matches ────────────────────────────────────────────────────────────
+    match /matches/{matchId} {
+      allow read: if isAuth();
+      allow write: if false; // Cloud Functions only
+
+      match /events/{eventId} {
+        allow read: if isAuth();
+        allow write: if false;
+      }
+
+      match /playerStats/{statId} {
+        allow read: if isAuth();
+        allow write: if false;
+      }
+    }
+
+    // ─── Leagues ────────────────────────────────────────────────────────────
+    match /leagues/{leagueId} {
+      allow read: if isLeagueMember(leagueId) || isLeagueAdmin(leagueId);
+      allow create: if isAuth();
+      allow update: if isLeagueAdmin(leagueId);
+      allow delete: if isLeagueOwner(leagueId);
+
+      // Members subcollection
+      match /members/{memberId} {
+        allow read: if isAuth() && (
+          isLeagueMember(leagueId) ||
+          request.auth.uid == memberId
+        );
+        allow create: if isAuth() && request.auth.uid == memberId;
+        allow update: if isLeagueAdmin(leagueId);
+        allow delete: if isLeagueAdmin(leagueId) || isUser(memberId);
+      }
+
+      // Predictions subcollection
+      match /predictions/{predictionId} {
+        allow read: if isLeagueMember(leagueId);
+        allow create, update: if isAuth() &&
+          request.auth.uid == request.resource.data.userId &&
+          request.resource.data.status != 'locked';
+        allow delete: if false;
+      }
+
+      // Teams subcollection
+      match /teams/{userId} {
+        allow read: if isLeagueMember(leagueId);
+        allow create, update: if isUser(userId);
+        allow delete: if false;
+      }
+    }
+
+    // collectionGroup query for members (used to find all leagues a user belongs to)
+    match /{path=**}/members/{memberId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+  }
+}
