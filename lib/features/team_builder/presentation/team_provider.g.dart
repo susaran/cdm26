@@ -144,5 +144,134 @@ class _MyTeamProviderElement
   String get leagueId => (origin as MyTeamProvider).leagueId;
 }
 
+String _$watchTeamHash() => r'c5338f886eeb933799e093d04069f133fd964d46';
+
+/// See also [watchTeam].
+@ProviderFor(watchTeam)
+const watchTeamProvider = WatchTeamFamily();
+
+/// See also [watchTeam].
+class WatchTeamFamily extends Family<AsyncValue<TeamModel?>> {
+  /// See also [watchTeam].
+  const WatchTeamFamily();
+
+  /// See also [watchTeam].
+  WatchTeamProvider call(String leagueId, String userId) {
+    return WatchTeamProvider(leagueId, userId);
+  }
+
+  @override
+  WatchTeamProvider getProviderOverride(covariant WatchTeamProvider provider) {
+    return call(provider.leagueId, provider.userId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'watchTeamProvider';
+}
+
+/// See also [watchTeam].
+class WatchTeamProvider extends AutoDisposeStreamProvider<TeamModel?> {
+  /// See also [watchTeam].
+  WatchTeamProvider(String leagueId, String userId)
+    : this._internal(
+        (ref) => watchTeam(ref as WatchTeamRef, leagueId, userId),
+        from: watchTeamProvider,
+        name: r'watchTeamProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$watchTeamHash,
+        dependencies: WatchTeamFamily._dependencies,
+        allTransitiveDependencies: WatchTeamFamily._allTransitiveDependencies,
+        leagueId: leagueId,
+        userId: userId,
+      );
+
+  WatchTeamProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.leagueId,
+    required this.userId,
+  }) : super.internal();
+
+  final String leagueId;
+  final String userId;
+
+  @override
+  Override overrideWith(
+    Stream<TeamModel?> Function(WatchTeamRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: WatchTeamProvider._internal(
+        (ref) => create(ref as WatchTeamRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        leagueId: leagueId,
+        userId: userId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeStreamProviderElement<TeamModel?> createElement() {
+    return _WatchTeamProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is WatchTeamProvider &&
+        other.leagueId == leagueId &&
+        other.userId == userId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, leagueId.hashCode);
+    hash = _SystemHash.combine(hash, userId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin WatchTeamRef on AutoDisposeStreamProviderRef<TeamModel?> {
+  /// The parameter `leagueId` of this provider.
+  String get leagueId;
+
+  /// The parameter `userId` of this provider.
+  String get userId;
+}
+
+class _WatchTeamProviderElement
+    extends AutoDisposeStreamProviderElement<TeamModel?>
+    with WatchTeamRef {
+  _WatchTeamProviderElement(super.provider);
+
+  @override
+  String get leagueId => (origin as WatchTeamProvider).leagueId;
+  @override
+  String get userId => (origin as WatchTeamProvider).userId;
+}
+
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart' show Ref;
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../matches/domain/player_model.dart';
 import '../domain/team_model.dart';
@@ -66,20 +65,6 @@ class TeamRepository {
     if (!canAddPosition(team, player.positionLabel)) {
       throw TeamException('Position quota full for ${player.positionLabel}.');
     }
-    if (team.budgetRemaining < player.fantasyPrice) {
-      throw const TeamException('Not enough budget.');
-    }
-
-    // Enforce max 3 players per country
-    if (player.countryCode.isNotEmpty) {
-      final countryCount = team.players
-          .where((p) => p.countryCode == player.countryCode)
-          .length;
-      if (countryCount >= AppConstants.maxPlayersPerCountry) {
-        throw TeamException(
-            'Max ${AppConstants.maxPlayersPerCountry} players from same country.');
-      }
-    }
 
     // First starter slot; overflow goes to bench
     final isStarter = _starterCountForPosition(team, player.positionLabel) <
@@ -88,7 +73,7 @@ class TeamRepository {
     final slot = TeamPlayerSlot(
       playerId: player.playerId,
       position: player.positionLabel,
-      purchasePrice: player.fantasyPrice,
+      purchasePrice: 0,  // no salary cap — draft-based only
       displayName: player.displayName,
       teamName: player.teamName,
       countryCode: player.countryCode,
@@ -98,7 +83,6 @@ class TeamRepository {
 
     return team.copyWith(
       players: [...team.players, slot],
-      budgetUsed: team.budgetUsed + player.fantasyPrice,
     );
   }
 
@@ -173,22 +157,6 @@ class TeamRepository {
     if (team.teamPickId == null) {
       errors.add('Pick a national team (DST slot).');
     }
-    if (team.budgetUsed > team.budgetLimit) {
-      errors.add('Budget exceeded.');
-    }
-
-    final countryCount = <String, int>{};
-    for (final p in team.players) {
-      if (p.countryCode.isNotEmpty) {
-        countryCount[p.countryCode] = (countryCount[p.countryCode] ?? 0) + 1;
-      }
-    }
-    for (final entry in countryCount.entries) {
-      if (entry.value > AppConstants.maxPlayersPerCountry) {
-        errors.add('Max ${AppConstants.maxPlayersPerCountry} players per country (${entry.key}).');
-      }
-    }
-
     return errors;
   }
 

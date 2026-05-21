@@ -9,6 +9,69 @@ import 'league_provider.dart';
 class LeagueScreen extends ConsumerWidget {
   const LeagueScreen({super.key});
 
+  void _showLeagueActions(
+      BuildContext context, String leagueId, String name) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(name,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.leaderboard),
+              title: const Text('Leaderboard'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/leagues/$leagueId/leaderboard');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sports_esports),
+              title: const Text('Draft Room'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/leagues/$leagueId/draft');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group),
+              title: const Text('Build Squad'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/leagues/$leagueId/team');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz),
+              title: const Text('Trades'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/leagues/$leagueId/trades');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.sports_soccer),
+              title: const Text('Predictions'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/leagues/$leagueId/predictions');
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final leaguesAsync = ref.watch(userLeaguesProvider);
@@ -89,8 +152,7 @@ class LeagueScreen extends ConsumerWidget {
                       '${league.memberCount} members • ${league.status.name}',
                       style: const TextStyle(color: AppColors.textSecondary)),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () =>
-                      context.go('/leagues/${league.leagueId}/leaderboard'),
+                  onTap: () => _showLeagueActions(context, league.leagueId, league.name),
                 ),
               );
             },

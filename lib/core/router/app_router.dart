@@ -5,6 +5,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../features/auth/presentation/auth_provider.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/draft/presentation/draft_lobby_screen.dart';
+import '../../features/draft/presentation/draft_room_screen.dart';
 import '../../features/league/presentation/create_league_screen.dart';
 import '../../features/league/presentation/join_league_screen.dart';
 import '../../features/league/presentation/league_screen.dart';
@@ -15,6 +17,7 @@ import '../../features/predictions/presentation/predictions_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/splash/splash_screen.dart';
 import '../../features/team_builder/presentation/team_builder_screen.dart';
+import '../../features/trade/presentation/trade_screen.dart';
 import '../shell/main_shell.dart';
 
 part 'app_router.g.dart';
@@ -39,22 +42,22 @@ GoRouter appRouter(Ref ref) {
     routes: [
       GoRoute(
         path: '/splash',
-        builder: (_, __) => const SplashScreen(),
+        builder: (_, _) => const SplashScreen(),
       ),
       GoRoute(
         path: '/auth/login',
-        builder: (_, __) => const LoginScreen(),
+        builder: (_, _) => const LoginScreen(),
       ),
       GoRoute(
         path: '/auth/register',
-        builder: (_, __) => const RegisterScreen(),
+        builder: (_, _) => const RegisterScreen(),
       ),
       ShellRoute(
-        builder: (_, __, child) => MainShell(child: child),
+        builder: (_, _, child) => MainShell(child: child),
         routes: [
           GoRoute(
             path: '/fixtures',
-            builder: (_, __) => const FixturesScreen(),
+            builder: (_, _) => const FixturesScreen(),
             routes: [
               GoRoute(
                 path: 'match/:matchId',
@@ -65,15 +68,15 @@ GoRouter appRouter(Ref ref) {
           ),
           GoRoute(
             path: '/leagues',
-            builder: (_, __) => const LeagueScreen(),
+            builder: (_, _) => const LeagueScreen(),
             routes: [
               GoRoute(
                 path: 'create',
-                builder: (_, __) => const CreateLeagueScreen(),
+                builder: (_, _) => const CreateLeagueScreen(),
               ),
               GoRoute(
                 path: 'join',
-                builder: (_, __) => const JoinLeagueScreen(),
+                builder: (_, _) => const JoinLeagueScreen(),
               ),
               GoRoute(
                 path: ':leagueId/leaderboard',
@@ -90,11 +93,28 @@ GoRouter appRouter(Ref ref) {
                 builder: (_, state) => PredictionsScreen(
                     leagueId: state.pathParameters['leagueId']!),
               ),
+              GoRoute(
+                path: ':leagueId/draft',
+                builder: (_, state) => DraftLobbyScreen(
+                    leagueId: state.pathParameters['leagueId']!),
+                routes: [
+                  GoRoute(
+                    path: 'room',
+                    builder: (_, state) => DraftRoomScreen(
+                        leagueId: state.pathParameters['leagueId']!),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: ':leagueId/trades',
+                builder: (_, state) => TradeScreen(
+                    leagueId: state.pathParameters['leagueId']!),
+              ),
             ],
           ),
           GoRoute(
             path: '/profile',
-            builder: (_, __) => const ProfileScreen(),
+            builder: (_, _) => const ProfileScreen(),
           ),
         ],
       ),

@@ -101,6 +101,32 @@ service cloud.firestore {
         allow create, update: if isUser(userId);
         allow delete: if false;
       }
+
+      // Draft doc (one per league, same id as leagueId)
+      match /draft/{draftId} {
+        allow read: if isLeagueMember(leagueId);
+        allow create: if isLeagueOwner(leagueId);
+        allow update: if isLeagueMember(leagueId); // members update during pick phase
+        allow delete: if isLeagueOwner(leagueId);
+      }
+
+      // Draft picks subcollection
+      match /draftPicks/{pickId} {
+        allow read: if isLeagueMember(leagueId);
+        allow create: if isLeagueMember(leagueId);
+        allow update, delete: if false;
+      }
+
+      // Trades subcollection
+      match /trades/{tradeId} {
+        allow read: if isLeagueMember(leagueId);
+        allow create: if isLeagueMember(leagueId);
+        allow update: if isAuth() && (
+          request.auth.uid == resource.data.proposerUserId ||
+          request.auth.uid == resource.data.targetUserId
+        );
+        allow delete: if false;
+      }
     }
 
     // collectionGroup query for members (used to find all leagues a user belongs to)

@@ -27,8 +27,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   static const _gold = Color(0xFFD4AF37);
   static const _darkBlue = Color(0xFF060E1A);
-  static const _midBlue = Color(0xFF0D1F36);
-  static const _brandBlue = Color(0xFF1A3A6B);
 
   @override
   void initState() {

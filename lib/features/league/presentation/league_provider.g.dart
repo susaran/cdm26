@@ -167,5 +167,124 @@ class _LeagueMembersProviderElement
   String get leagueId => (origin as LeagueMembersProvider).leagueId;
 }
 
+String _$leagueByIdHash() => r'67f522505fcf8292b38aab00f19e67cb61a99b19';
+
+/// See also [leagueById].
+@ProviderFor(leagueById)
+const leagueByIdProvider = LeagueByIdFamily();
+
+/// See also [leagueById].
+class LeagueByIdFamily extends Family<AsyncValue<LeagueModel?>> {
+  /// See also [leagueById].
+  const LeagueByIdFamily();
+
+  /// See also [leagueById].
+  LeagueByIdProvider call(String leagueId) {
+    return LeagueByIdProvider(leagueId);
+  }
+
+  @override
+  LeagueByIdProvider getProviderOverride(
+    covariant LeagueByIdProvider provider,
+  ) {
+    return call(provider.leagueId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'leagueByIdProvider';
+}
+
+/// See also [leagueById].
+class LeagueByIdProvider extends AutoDisposeFutureProvider<LeagueModel?> {
+  /// See also [leagueById].
+  LeagueByIdProvider(String leagueId)
+    : this._internal(
+        (ref) => leagueById(ref as LeagueByIdRef, leagueId),
+        from: leagueByIdProvider,
+        name: r'leagueByIdProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$leagueByIdHash,
+        dependencies: LeagueByIdFamily._dependencies,
+        allTransitiveDependencies: LeagueByIdFamily._allTransitiveDependencies,
+        leagueId: leagueId,
+      );
+
+  LeagueByIdProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.leagueId,
+  }) : super.internal();
+
+  final String leagueId;
+
+  @override
+  Override overrideWith(
+    FutureOr<LeagueModel?> Function(LeagueByIdRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: LeagueByIdProvider._internal(
+        (ref) => create(ref as LeagueByIdRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        leagueId: leagueId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<LeagueModel?> createElement() {
+    return _LeagueByIdProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is LeagueByIdProvider && other.leagueId == leagueId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, leagueId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin LeagueByIdRef on AutoDisposeFutureProviderRef<LeagueModel?> {
+  /// The parameter `leagueId` of this provider.
+  String get leagueId;
+}
+
+class _LeagueByIdProviderElement
+    extends AutoDisposeFutureProviderElement<LeagueModel?>
+    with LeagueByIdRef {
+  _LeagueByIdProviderElement(super.provider);
+
+  @override
+  String get leagueId => (origin as LeagueByIdProvider).leagueId;
+}
+
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

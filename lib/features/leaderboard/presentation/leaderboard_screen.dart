@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/loading_widget.dart';
 import '../../auth/presentation/auth_provider.dart';
-import '../../league/data/league_repository.dart';
 import '../domain/leaderboard_entry_model.dart';
 import 'leaderboard_provider.dart';
 

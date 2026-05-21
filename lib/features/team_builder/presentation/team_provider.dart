@@ -13,3 +13,8 @@ Stream<TeamModel?> myTeam(Ref ref, String leagueId) {
   if (user == null) return Stream.value(null);
   return ref.watch(teamRepositoryProvider).watchTeam(leagueId, user.uid);
 }
+
+@riverpod
+Stream<TeamModel?> watchTeam(Ref ref, String leagueId, String userId) {
+  return ref.watch(teamRepositoryProvider).watchTeam(leagueId, userId);
+}
