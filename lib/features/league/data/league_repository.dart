@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart' show Ref;
 import 'package:uuid/uuid.dart';
@@ -134,6 +137,24 @@ class LeagueRepository {
     final doc = await _leagues.doc(leagueId).get();
     if (!doc.exists) return null;
     return LeagueModel.fromFirestore(doc);
+  }
+
+  Future<String?> uploadTeamBadge(
+      String leagueId, String userId, File imageFile) async {
+    final ref = FirebaseStorage.instance
+        .ref('leagues/$leagueId/badges/$userId.jpg');
+    await ref.putFile(imageFile);
+    return ref.getDownloadURL();
+  }
+
+  Future<void> updateTeamIdentity(
+      String leagueId, String userId, String teamName,
+      {String? teamBadgeUrl}) async {
+    await _leagues.doc(leagueId).collection('members').doc(userId).update({
+      'teamName': teamName,
+      if (teamBadgeUrl != null) 'teamBadgeUrl': teamBadgeUrl,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> deleteLeague(String leagueId) async {

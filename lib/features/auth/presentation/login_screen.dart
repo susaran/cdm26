@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../data/auth_service.dart';
+
+const _kPrivacyPolicyUrl = 'https://yoursite.com/privacy';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -156,6 +159,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                 ),
                 const Spacer(),
+                // Privacy policy — required by Apple App Store
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: GestureDetector(
+                    onTap: () async {
+                      final uri = Uri.parse(_kPrivacyPolicyUrl);
+                      if (await canLaunchUrl(uri)) launchUrl(uri);
+                    },
+                    child: const Text(
+                      'Privacy Policy',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          decoration: TextDecoration.underline),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

@@ -11,6 +11,8 @@ class LeagueMemberModel {
     required this.displayName,
     required this.joinedAt,
     this.photoUrl,
+    this.teamName,
+    this.teamBadgeUrl,
     this.role = MemberRole.member,
     this.status = MemberStatus.active,
     this.paidStatus = PaidStatus.notApplicable,
@@ -26,6 +28,9 @@ class LeagueMemberModel {
   final String leagueId;
   final String displayName;
   final String? photoUrl;
+  // Per-league team identity — users choose their own team name and badge
+  final String? teamName;
+  final String? teamBadgeUrl;
   final MemberRole role;
   final MemberStatus status;
   final PaidStatus paidStatus;
@@ -44,6 +49,8 @@ class LeagueMemberModel {
       leagueId: d['leagueId'] ?? '',
       displayName: d['displayName'] ?? '',
       photoUrl: d['photoUrl'],
+      teamName: d['teamName'],
+      teamBadgeUrl: d['teamBadgeUrl'],
       role: MemberRole.values.firstWhere(
           (e) => e.name == d['role'], orElse: () => MemberRole.member),
       status: MemberStatus.values.firstWhere(
@@ -66,6 +73,8 @@ class LeagueMemberModel {
         'leagueId': leagueId,
         'displayName': displayName,
         'photoUrl': photoUrl,
+        'teamName': teamName,
+        'teamBadgeUrl': teamBadgeUrl,
         'role': role.name,
         'status': status.name,
         'paidStatus': paidStatus.name,

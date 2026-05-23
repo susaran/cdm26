@@ -11,6 +11,8 @@ class LeaderboardEntry {
     this.exactScores = 0,
     this.correctResults = 0,
     this.roundPoints = const {},
+    this.teamName,
+    this.teamBadgeUrl,
   });
 
   final String userId;
@@ -25,6 +27,8 @@ class LeaderboardEntry {
   final int correctResults;
   // Points earned in each scoring round, keyed by round number (1–9).
   final Map<int, int> roundPoints;
+  final String? teamName;
+  final String? teamBadgeUrl;
 
   int pointsForRound(int round) => roundPoints[round] ?? 0;
 

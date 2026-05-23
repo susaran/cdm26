@@ -8,6 +8,7 @@ import '../../auth/presentation/auth_provider.dart';
 import '../data/league_repository.dart';
 import '../domain/league_model.dart';
 import 'league_provider.dart';
+import 'team_identity_sheet.dart';
 
 class LeagueScreen extends ConsumerStatefulWidget {
   const LeagueScreen({super.key});
@@ -74,6 +75,14 @@ class _LeagueScreenState extends ConsumerState<LeagueScreen> {
               onTap: () {
                 Navigator.pop(context);
                 context.go('/leagues/${league.leagueId}/predictions');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit, color: AppColors.secondary),
+              title: const Text('Edit Team Name & Badge'),
+              onTap: () {
+                Navigator.pop(context);
+                showTeamIdentitySheet(context, ref, league.leagueId);
               },
             ),
             if (isAdmin) ...[
