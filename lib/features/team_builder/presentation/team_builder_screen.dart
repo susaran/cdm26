@@ -154,8 +154,9 @@ class _MySquadTab extends ConsumerWidget {
                           onTap: () => _showPlayerActions(context, ref, slot),
                         )),
                 ...List.generate(
-                  required -
-                      team.players.where((p) => p.position == pos).length,
+                  (required -
+                          team.players.where((p) => p.position == pos).length)
+                      .clamp(0, required),
                   (_) => _EmptySlot(position: pos, color: color),
                 ),
               ],
