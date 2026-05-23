@@ -1,3 +1,135 @@
+// ─── WC 2026 Scoring Rounds ──────────────────────────────────────────────────
+
+class ScoringRoundInfo {
+  const ScoringRoundInfo({
+    required this.round,
+    required this.label,
+    required this.shortLabel,
+    required this.dateRange,
+    required this.start,
+    required this.end,
+  });
+
+  final int round;
+  final String label;       // e.g. "Group Stage – Round 1"
+  final String shortLabel;  // e.g. "GS-R1"
+  final String dateRange;   // e.g. "Jun 12–17"
+  final DateTime start;
+  final DateTime end;
+
+  bool get isActive {
+    final now = DateTime.now().toUtc();
+    return !now.isBefore(start) && !now.isAfter(end);
+  }
+
+  bool get isUpcoming => DateTime.now().toUtc().isBefore(start);
+  bool get isCompleted => DateTime.now().toUtc().isAfter(end);
+}
+
+class ScoringRounds {
+  ScoringRounds._();
+
+  static const int groupMD1 = 1;
+  static const int groupMD2 = 2;
+  static const int groupMD3 = 3;
+  static const int roundOf32 = 4;
+  static const int roundOf16 = 5;
+  static const int quarterFinals = 6;
+  static const int semiFinals = 7;
+  static const int thirdPlace = 8;
+  static const int finalRound = 9;
+
+  static final List<ScoringRoundInfo> all = [
+    ScoringRoundInfo(
+      round: 1,
+      label: 'Group Stage – Round 1',
+      shortLabel: 'GS-R1',
+      dateRange: 'Jun 12–17',
+      start: DateTime.utc(2026, 6, 12),
+      end: DateTime.utc(2026, 6, 17, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 2,
+      label: 'Group Stage – Round 2',
+      shortLabel: 'GS-R2',
+      dateRange: 'Jun 17–22',
+      start: DateTime.utc(2026, 6, 17),
+      end: DateTime.utc(2026, 6, 22, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 3,
+      label: 'Group Stage – Round 3',
+      shortLabel: 'GS-R3',
+      dateRange: 'Jun 22–26',
+      start: DateTime.utc(2026, 6, 22),
+      end: DateTime.utc(2026, 6, 26, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 4,
+      label: 'Round of 32',
+      shortLabel: 'R32',
+      dateRange: 'Jun 29 – Jul 3',
+      start: DateTime.utc(2026, 6, 29),
+      end: DateTime.utc(2026, 7, 3, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 5,
+      label: 'Round of 16',
+      shortLabel: 'R16',
+      dateRange: 'Jul 5–8',
+      start: DateTime.utc(2026, 7, 5),
+      end: DateTime.utc(2026, 7, 8, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 6,
+      label: 'Quarter-Finals',
+      shortLabel: 'QF',
+      dateRange: 'Jul 11–12',
+      start: DateTime.utc(2026, 7, 11),
+      end: DateTime.utc(2026, 7, 12, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 7,
+      label: 'Semi-Finals',
+      shortLabel: 'SF',
+      dateRange: 'Jul 15–16',
+      start: DateTime.utc(2026, 7, 15),
+      end: DateTime.utc(2026, 7, 16, 23, 59),
+    ),
+    ScoringRoundInfo(
+      round: 8,
+      label: 'Third Place',
+      shortLabel: '3rd',
+      dateRange: 'Jul 19',
+      start: DateTime.utc(2026, 7, 19),
+      end: DateTime.utc(2026, 7, 19, 18, 0),
+    ),
+    ScoringRoundInfo(
+      round: 9,
+      label: 'Final',
+      shortLabel: 'Final',
+      dateRange: 'Jul 19',
+      start: DateTime.utc(2026, 7, 19, 19, 0),
+      end: DateTime.utc(2026, 7, 19, 23, 59),
+    ),
+  ];
+
+  static ScoringRoundInfo get current {
+    final now = DateTime.now().toUtc();
+    // Active round takes priority
+    for (final r in all) {
+      if (r.isActive) return r;
+    }
+    // Before tournament: return Round 1
+    if (now.isBefore(all.first.start)) return all.first;
+    // After tournament: return Final
+    return all.last;
+  }
+
+  static ScoringRoundInfo forRound(int round) =>
+      all.firstWhere((r) => r.round == round, orElse: () => all.first);
+}
+
 class FantasyPoints {
   // ─── Appearance ─────────────────────────────────────────────
   static const int starts = 2;
