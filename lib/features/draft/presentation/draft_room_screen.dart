@@ -368,35 +368,25 @@ class _PlayerPickTile extends StatelessWidget {
         _isDST ? 'National Team · DST scoring' : player.teamName,
         style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
       ),
-      trailing: isMyTurn && isPositionFull
-          ? Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(6),
+      trailing: isMyTurn && !isPositionFull
+          ? ElevatedButton(
+              onPressed: picking ? null : onPick,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: const Text('FULL',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textSecondary)),
+              child: picking
+                  ? const SizedBox(
+                      width: 14, height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Pick'),
             )
-          : isMyTurn
-              ? ElevatedButton(
-                  onPressed: picking ? null : onPick,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: picking
-                      ? const SizedBox(
-                          width: 14, height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Pick'),
-                )
-              : Text('£${player.fantasyPrice.toStringAsFixed(0)}m',
-                  style: const TextStyle(color: AppColors.textSecondary)),
+          : Text('£${player.fantasyPrice.toStringAsFixed(0)}m',
+              style: const TextStyle(color: AppColors.textSecondary)),
+      tileColor: isMyTurn && isPositionFull
+          ? AppColors.surface.withValues(alpha: 0.4)
+          : null,
     );
   }
 

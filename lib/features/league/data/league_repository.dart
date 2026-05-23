@@ -136,6 +136,17 @@ class LeagueRepository {
     return LeagueModel.fromFirestore(doc);
   }
 
+  Future<void> deleteLeague(String leagueId) async {
+    final leagueRef = _leagues.doc(leagueId);
+    final membersSnap = await leagueRef.collection('members').get();
+    final batch = _db.batch();
+    for (final doc in membersSnap.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(leagueRef);
+    await batch.commit();
+  }
+
   String _generateInviteCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final random = DateTime.now().microsecondsSinceEpoch;
