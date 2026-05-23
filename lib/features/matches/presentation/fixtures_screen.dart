@@ -266,7 +266,7 @@ class _DraftOpenState extends StatelessWidget {
                 icon: Icons.people,
                 title: 'Build Your Squad',
                 subtitle:
-                    '15 players · £100m budget · 2 GK / 5 DEF / 5 MID / 3 FWD',
+                    '15 picks · 2 GK / 4 DEF / 4 MID / 4 FWD + 1 NAT',
                 color: AppColors.midColor,
                 onTap: () => context.go('/leagues'),
               ),
