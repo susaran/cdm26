@@ -74,14 +74,22 @@ export const syncAllFixtures = functions.pubsub
           TBD: "scheduled",
         };
 
+        const stage = mapStage(league.round);
+        const matchday = extractMatchday(league.round);
+        const scoringRound = mapScoringRound(stage, matchday);
+        const scoringRoundLabel = scoringRoundLabelFor(scoringRound, matchday);
+
         batch.set(
           matchRef,
           {
             matchId,
             providerMatchId: String(f.id),
             tournamentId: "wc_2026",
-            stage: mapStage(league.round),
+            stage,
             group: league.round?.includes("Group") ? league.round.split(" - ")[1] : null,
+            matchday,
+            scoringRound,
+            scoringRoundLabel,
             homeTeamId: `team_${teams.home.id}`,
             awayTeamId: `team_${teams.away.id}`,
             homeTeamName: teams.home.name,
@@ -207,7 +215,43 @@ function mapStage(round: string): string {
   if (r.includes("round of 16")) return "roundOf16";
   if (r.includes("quarter")) return "quarterfinal";
   if (r.includes("semi")) return "semifinal";
-  if (r.includes("3rd")) return "thirdPlace";
+  if (r.includes("3rd") || r.includes("third")) return "thirdPlace";
   if (r.includes("final")) return "finalStage";
   return "group";
+}
+
+// Returns 1, 2, or 3 for group stage matchdays; null for knockout rounds.
+// API-Football sends rounds like "Group Stage - 1", "Group Stage - 2", "Group Stage - 3".
+function extractMatchday(round: string): number | null {
+  if (!round) return null;
+  const match = round.match(/Group Stage\s*-\s*(\d)/i);
+  if (match) return parseInt(match[1], 10);
+  return null;
+}
+
+// Maps stage + matchday to a global scoring round number (1–9).
+function mapScoringRound(stage: string, matchday: number | null): number {
+  if (stage === "group") return matchday ?? 1;
+  const knockoutMap: Record<string, number> = {
+    roundOf32: 4,
+    roundOf16: 5,
+    quarterfinal: 6,
+    semifinal: 7,
+    thirdPlace: 8,
+    finalStage: 9,
+  };
+  return knockoutMap[stage] ?? 1;
+}
+
+function scoringRoundLabelFor(round: number, matchday: number | null): string {
+  if (matchday !== null) return `Group Stage – Round ${matchday}`;
+  const labels: Record<number, string> = {
+    4: "Round of 32",
+    5: "Round of 16",
+    6: "Quarter-Finals",
+    7: "Semi-Finals",
+    8: "Third Place",
+    9: "Final",
+  };
+  return labels[round] ?? `Round ${round}`;
 }

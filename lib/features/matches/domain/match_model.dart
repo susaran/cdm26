@@ -23,6 +23,10 @@ enum MatchStage {
   finalStage,
 }
 
+// WC 2026 scoring rounds:
+//   1 = Group Stage MD1   4 = Round of 32   7 = Semi-Finals
+//   2 = Group Stage MD2   5 = Round of 16   8 = Third Place
+//   3 = Group Stage MD3   6 = Quarter-Finals 9 = Final
 class MatchModel {
   const MatchModel({
     required this.matchId,
@@ -35,6 +39,9 @@ class MatchModel {
     this.providerMatchId,
     this.stage = MatchStage.group,
     this.group,
+    this.matchday,
+    this.scoringRound,
+    this.scoringRoundLabel,
     this.homeScore = 0,
     this.awayScore = 0,
     this.status = MatchStatus.scheduled,
@@ -51,6 +58,11 @@ class MatchModel {
   final String tournamentId;
   final MatchStage stage;
   final String? group;
+  // 1–3 within group stage; null for knockout rounds
+  final int? matchday;
+  // 1–9 global scoring round (see comment above)
+  final int? scoringRound;
+  final String? scoringRoundLabel;
   final String homeTeamId;
   final String awayTeamId;
   final String homeTeamName;
@@ -90,6 +102,9 @@ class MatchModel {
         orElse: () => MatchStage.group,
       ),
       group: d['group'],
+      matchday: d['matchday'] as int?,
+      scoringRound: d['scoringRound'] as int?,
+      scoringRoundLabel: d['scoringRoundLabel'] as String?,
       homeTeamId: d['homeTeamId'] ?? '',
       awayTeamId: d['awayTeamId'] ?? '',
       homeTeamName: d['homeTeamName'] ?? '',

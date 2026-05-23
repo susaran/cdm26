@@ -315,13 +315,28 @@ export const recalculateMatch = functions.https.onCall(async (data, context) => 
   return { success: true };
 });
 
+// Maps stage string + matchday to a global scoring round number (1–9).
+// Must stay in sync with api_football_sync.ts and match_model.dart comments.
+function matchScoringRound(matchData: admin.firestore.DocumentData): number {
+  const stage: string = matchData.stage ?? "group";
+  const matchday: number | null = matchData.matchday ?? null;
+  if (stage === "group") return matchday ?? 1;
+  const map: Record<string, number> = {
+    roundOf32: 4, roundOf16: 5, quarterfinal: 6,
+    semifinal: 7, thirdPlace: 8, finalStage: 9,
+  };
+  return map[stage] ?? 1;
+}
+
 async function runScoringForMatch(matchId: string, matchData: admin.firestore.DocumentData) {
   const score: MatchScore = {
     home: matchData.score?.home ?? 0,
     away: matchData.score?.away ?? 0,
   };
+  const scoringRound = matchScoringRound(matchData);
+  const roundKey = `roundPoints.r${scoringRound}`;
 
-  // 1. Calculate fantasy points for each player in this match
+  // ── 1. Calculate player fantasy points ──────────────────────────────────────
   const playerStatsSnap = await db
     .collection("matches")
     .doc(matchId)
@@ -329,21 +344,21 @@ async function runScoringForMatch(matchId: string, matchData: admin.firestore.Do
     .get();
 
   const playerPoints: Record<string, number> = {};
-  const batch = db.batch();
+  const statsBatch = db.batch();
 
   for (const statDoc of playerStatsSnap.docs) {
     const stat = statDoc.data() as PlayerStat;
     const pts = calcFantasyPoints(stat);
     playerPoints[stat.playerId] = pts;
-
-    batch.update(statDoc.ref, {
+    statsBatch.update(statDoc.ref, {
       fantasyPointsRaw: pts,
       fantasyPointsFinal: pts,
+      scoringRound,
       lastCalculatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   }
 
-  // Get first scorer from events
+  // First scorer for prediction scoring
   const eventsSnap = await db
     .collection("matches")
     .doc(matchId)
@@ -354,22 +369,52 @@ async function runScoringForMatch(matchId: string, matchData: admin.firestore.Do
     .get();
   const firstScorerPlayerId = eventsSnap.docs[0]?.data()?.playerId;
 
-  // 2. Update aggregate player stats
+  // ── 2. Update aggregate player career stats ─────────────────────────────────
   for (const [playerId, pts] of Object.entries(playerPoints)) {
     const playerRef = db.collection("players").doc(playerId);
-    batch.update(playerRef, {
+    statsBatch.update(playerRef, {
       "statsSummary.totalFantasyPoints": admin.firestore.FieldValue.increment(pts),
       "statsSummary.appearances": admin.firestore.FieldValue.increment(1),
     });
   }
+  await statsBatch.commit();
 
-  await batch.commit();
+  // ── 3. Build DST points for both teams in this match ────────────────────────
+  const homeTeamStat: TeamMatchStat = {
+    teamId: matchData.homeTeamId,
+    goalsScored: score.home,
+    goalsConceded: score.away,
+    won: score.home > score.away,
+    drew: score.home === score.away,
+    accuratePasses: matchData.homeAccuratePasses ?? 0,
+    saves: matchData.homeGkSaves ?? 0,
+    interceptions: matchData.homeInterceptions ?? 0,
+    tacklesWon: matchData.homeTacklesWon ?? 0,
+  };
+  const awayTeamStat: TeamMatchStat = {
+    teamId: matchData.awayTeamId,
+    goalsScored: score.away,
+    goalsConceded: score.home,
+    won: score.away > score.home,
+    drew: score.home === score.away,
+    accuratePasses: matchData.awayAccuratePasses ?? 0,
+    saves: matchData.awayGkSaves ?? 0,
+    interceptions: matchData.awayInterceptions ?? 0,
+    tacklesWon: matchData.awayTacklesWon ?? 0,
+  };
+  const teamDSTPoints: Record<string, number> = {
+    [homeTeamStat.teamId]: calcTeamDSTPoints(homeTeamStat),
+    [awayTeamStat.teamId]: calcTeamDSTPoints(awayTeamStat),
+  };
 
-  // 3. Calculate prediction points and update league members
+  // ── 4. Apply points to every league ─────────────────────────────────────────
   const leaguesSnap = await db.collection("leagues").get();
 
   for (const leagueDoc of leaguesSnap.docs) {
     const leagueId = leagueDoc.id;
+    const memberBatch = db.batch();
+
+    // ── 4a. Predictions ───────────────────────────────────────────────────────
     const predictionsSnap = await db
       .collection("leagues")
       .doc(leagueId)
@@ -378,8 +423,6 @@ async function runScoringForMatch(matchId: string, matchData: admin.firestore.Do
       .where("status", "==", "submitted")
       .get();
 
-    const memberBatch = db.batch();
-
     for (const predDoc of predictionsSnap.docs) {
       const pred = predDoc.data();
       const pts = calcPredictionPoints(
@@ -387,102 +430,71 @@ async function runScoringForMatch(matchId: string, matchData: admin.firestore.Do
         score,
         firstScorerPlayerId
       );
-
       memberBatch.update(predDoc.ref, {
         points: pts,
         status: "locked",
         lockedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Update member's total prediction points
-      const memberRef = db
-        .collection("leagues")
-        .doc(leagueId)
-        .collection("members")
-        .doc(pred.userId);
+      const memberRef = db.collection("leagues").doc(leagueId).collection("members").doc(pred.userId);
       memberBatch.update(memberRef, {
         predictionPoints: admin.firestore.FieldValue.increment(pts.total),
         totalPoints: admin.firestore.FieldValue.increment(pts.total),
-        "tiebreakers.exactScores": admin.firestore.FieldValue.increment(
-          pts.exactScore > 0 ? 1 : 0
-        ),
-        "tiebreakers.correctResults": admin.firestore.FieldValue.increment(
-          pts.correctResult > 0 ? 1 : 0
-        ),
+        [roundKey]: admin.firestore.FieldValue.increment(pts.total),
+        "tiebreakers.exactScores": admin.firestore.FieldValue.increment(pts.exactScore > 0 ? 1 : 0),
+        "tiebreakers.correctResults": admin.firestore.FieldValue.increment(pts.correctResult > 0 ? 1 : 0),
       });
     }
 
-    // 4. Update fantasy points + DST points for each league member
-    const teamsSnap = await db
-      .collection("leagues")
-      .doc(leagueId)
-      .collection("teams")
-      .get();
-
-    // Build team-level DST stats from match data
-    const homeTeamStat: TeamMatchStat = {
-      teamId: matchData.homeTeamId,
-      goalsScored: score.home,
-      goalsConceded: score.away,
-      won: score.home > score.away,
-      drew: score.home === score.away,
-      accuratePasses: matchData.homeAccuratePasses ?? 0,
-      saves: matchData.homeGkSaves ?? 0,
-      interceptions: matchData.homeInterceptions ?? 0,
-      tacklesWon: matchData.homeTacklesWon ?? 0,
-    };
-    const awayTeamStat: TeamMatchStat = {
-      teamId: matchData.awayTeamId,
-      goalsScored: score.away,
-      goalsConceded: score.home,
-      won: score.away > score.home,
-      drew: score.home === score.away,
-      accuratePasses: matchData.awayAccuratePasses ?? 0,
-      saves: matchData.awayGkSaves ?? 0,
-      interceptions: matchData.awayInterceptions ?? 0,
-      tacklesWon: matchData.awayTacklesWon ?? 0,
-    };
-    const teamDSTPoints: Record<string, number> = {
-      [homeTeamStat.teamId]: calcTeamDSTPoints(homeTeamStat),
-      [awayTeamStat.teamId]: calcTeamDSTPoints(awayTeamStat),
-    };
+    // ── 4b. Fantasy squad points (with idempotency guard) ─────────────────────
+    const teamsSnap = await db.collection("leagues").doc(leagueId).collection("teams").get();
 
     for (const teamDoc of teamsSnap.docs) {
       const team = teamDoc.data();
+      const userId: string = team.userId;
+      const memberRef = db.collection("leagues").doc(leagueId).collection("members").doc(userId);
+
+      // Idempotency: skip if this match was already scored for this member.
+      // This prevents double-counting when the Firestore trigger fires more
+      // than once or when recalculateMatch is called on an already-scored match.
+      const memberSnap = await memberRef.get();
+      const alreadyScored: string[] = memberSnap.data()?.scoredMatchIds ?? [];
+      if (alreadyScored.includes(matchId)) continue;
+
       const players: Array<{ playerId: string }> = team.players ?? [];
       const captainId: string = team.captainPlayerId;
       const viceCaptainId: string = team.viceCaptainPlayerId;
 
-      // Player fantasy points (captain ×2, vice-captain ×1.5)
+      // Only count each player's points from THIS match — no cross-match
+      // double-dipping because each player appears in exactly one game per
+      // scoring round (a national team plays once per group matchday).
       let fantasyTotal = 0;
       for (const slot of players) {
         const pts = playerPoints[slot.playerId] ?? 0;
         if (slot.playerId === captainId) {
-          fantasyTotal += pts * 2;
+          fantasyTotal += pts * FANTASY.captainMultiplier;
         } else if (slot.playerId === viceCaptainId) {
-          fantasyTotal += pts * 1.5;
+          fantasyTotal += pts * FANTASY.viceCaptainMultiplier;
         } else {
           fantasyTotal += pts;
         }
       }
 
-      // DST team pick points
       const dstPts = team.teamPickId ? (teamDSTPoints[team.teamPickId] ?? 0) : 0;
-      const roundTotal = Math.round((fantasyTotal + dstPts) * 100) / 100;
+      const matchTotal = Math.round((fantasyTotal + dstPts) * 100) / 100;
 
-      const memberRef = db
-        .collection("leagues")
-        .doc(leagueId)
-        .collection("members")
-        .doc(team.userId);
       memberBatch.update(memberRef, {
-        fantasyPoints: admin.firestore.FieldValue.increment(roundTotal),
-        totalPoints: admin.firestore.FieldValue.increment(roundTotal),
+        fantasyPoints: admin.firestore.FieldValue.increment(matchTotal),
+        totalPoints: admin.firestore.FieldValue.increment(matchTotal),
+        // Per-round bucket — used by leaderboard round view and deduplication
+        [roundKey]: admin.firestore.FieldValue.increment(matchTotal),
+        // Record this matchId so re-triggers are skipped
+        scoredMatchIds: admin.firestore.FieldValue.arrayUnion(matchId),
       });
     }
 
     await memberBatch.commit();
   }
 
-  functions.logger.info(`Scoring complete for match ${matchId}`);
+  functions.logger.info(`Scoring complete for match ${matchId} (round ${scoringRound})`);
 }
