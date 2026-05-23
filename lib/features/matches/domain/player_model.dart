@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum PlayerPosition { gk, def, mid, fwd }
+enum PlayerPosition { gk, def, mid, fwd, dst }
 enum PlayerStatus { active, injured, suspended, doubtful, notSelected, unknown }
 
 class PlayerModel {
@@ -49,6 +49,7 @@ class PlayerModel {
         PlayerPosition.def => 'DEF',
         PlayerPosition.mid => 'MID',
         PlayerPosition.fwd => 'FWD',
+        PlayerPosition.dst => 'NAT',
       };
 
   factory PlayerModel.fromFirestore(DocumentSnapshot doc) {

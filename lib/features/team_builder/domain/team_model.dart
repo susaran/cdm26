@@ -2,12 +2,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TeamStatus { draft, submitted, locked, invalid }
 
-// Required squad composition (FPL-style)
-const kSquadTotal = 15;
+// Required squad composition: 14 players + 1 NAT = 15 picks total
+// Starting XI: 1 GK + 1 NAT + 3-5 DEF + 2-4 MID + 1-3 FWD
+// Bench: 4 players (remaining from each position)
+const kSquadTotal = 14;   // player picks (GK+DEF+MID+FWD), NAT is separate
 const kRequiredGK = 2;
-const kRequiredDEF = 5;
-const kRequiredMID = 5;
-const kRequiredFWD = 3;
+const kRequiredDEF = 4;
+const kRequiredMID = 4;
+const kRequiredFWD = 4;
 const kStartingXI = 11;
 const kBenchSize = 4;
 

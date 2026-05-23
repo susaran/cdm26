@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/loading_widget.dart';
 import '../../auth/presentation/auth_provider.dart';
 import '../../matches/domain/player_model.dart';
+import '../../team_builder/domain/team_model.dart';
 import '../data/draft_repository.dart';
 import '../domain/draft_model.dart';
 import 'draft_provider.dart';
@@ -24,9 +25,16 @@ class _DraftRoomScreenState extends ConsumerState<DraftRoomScreen> {
   String _posFilter = 'ALL';
   bool _picking = false;
   Timer? _tickTimer;
-  int _secondsLeft = 120;
+  int _secondsLeft = 600;
 
-  static const _positions = ['ALL', 'GK', 'DEF', 'MID', 'FWD'];
+  // Stored each build so the timer callback can access current state.
+  DraftModel? _currentDraft;
+  String _currentUserId = '';
+  List<PlayerModel> _availablePlayers = [];
+  List<DraftPick> _currentPicksList = [];
+  bool _isMyTurn = false;
+
+  static const _positions = ['ALL', 'GK', 'DEF', 'MID', 'FWD', 'NAT'];
 
   @override
   void dispose() {
@@ -43,8 +51,47 @@ class _DraftRoomScreenState extends ConsumerState<DraftRoomScreen> {
     setState(() => _secondsLeft = (draft.pickDurationSeconds - elapsed).clamp(0, draft.pickDurationSeconds));
     _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      setState(() => _secondsLeft = (_secondsLeft - 1).clamp(0, 9999));
+      final next = (_secondsLeft - 1).clamp(0, 9999);
+      setState(() => _secondsLeft = next);
+      if (next == 0 && _isMyTurn && !_picking) {
+        _autoPick();
+      }
     });
+  }
+
+  Map<String, int> _positionCounts(String userId) {
+    final counts = <String, int>{'GK': 0, 'DEF': 0, 'MID': 0, 'FWD': 0, 'NAT': 0};
+    for (final p in _currentPicksList.where((p) => p.userId == userId)) {
+      counts[p.position] = (counts[p.position] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  bool _isPositionFull(Map<String, int> counts, String position) =>
+      switch (position) {
+        'GK' => (counts['GK'] ?? 0) >= kRequiredGK,
+        'DEF' => (counts['DEF'] ?? 0) >= kRequiredDEF,
+        'MID' => (counts['MID'] ?? 0) >= kRequiredMID,
+        'FWD' => (counts['FWD'] ?? 0) >= kRequiredFWD,
+        'NAT' => (counts['NAT'] ?? 0) >= 1,
+        _ => false,
+      };
+
+  Future<void> _autoPick() async {
+    if (_picking || _currentDraft == null || _availablePlayers.isEmpty || !mounted) return;
+    final counts = _positionCounts(_currentUserId);
+    // Pick the highest-priced player in a position that still needs filling
+    final player = _availablePlayers.firstWhere(
+      (p) => !_isPositionFull(counts, p.positionLabel),
+      orElse: () => _availablePlayers.first,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('⏱ Time\'s up! Auto-drafting ${player.displayName}'),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+    await _pick(context, _currentDraft!, _currentUserId, player);
   }
 
   @override
@@ -71,6 +118,14 @@ class _DraftRoomScreenState extends ConsumerState<DraftRoomScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) => _startTimer(draft));
 
         final isMyTurn = draft.currentPickUserId == userId && !draft.isDone;
+        _currentDraft = draft;
+        _currentUserId = userId;
+        _isMyTurn = isMyTurn;
+
+        final allPicks = picksAsync.valueOrNull ?? [];
+        _currentPicksList = allPicks;
+        final myCounts = _positionCounts(userId);
+
         final availAsync = ref.watch(availablePlayersProvider(
             widget.leagueId, draft.draftedPlayerIds));
 
@@ -87,6 +142,9 @@ class _DraftRoomScreenState extends ConsumerState<DraftRoomScreen> {
             children: [
               // ── Status bar ──────────────────────────────────────────────
               _StatusBar(draft: draft, isMyTurn: isMyTurn),
+
+              // ── My squad slot tracker ───────────────────────────────────
+              _MySquadStatus(counts: myCounts),
 
               // ── Search + filter ─────────────────────────────────────────
               Padding(
@@ -133,6 +191,7 @@ class _DraftRoomScreenState extends ConsumerState<DraftRoomScreen> {
                   loading: () => const LoadingWidget(),
                   error: (e, _) => Center(child: Text('$e')),
                   data: (players) {
+                    _availablePlayers = players;
                     final filtered = players.where((p) {
                       final matchPos = _posFilter == 'ALL' ||
                           p.positionLabel == _posFilter;
@@ -157,6 +216,7 @@ class _DraftRoomScreenState extends ConsumerState<DraftRoomScreen> {
                         player: filtered[i],
                         isMyTurn: isMyTurn,
                         picking: _picking,
+                        isPositionFull: _isPositionFull(myCounts, filtered[i].positionLabel),
                         onPick: () => _pick(context, draft, userId, filtered[i]),
                       ),
                     );
@@ -250,7 +310,7 @@ class _TimerChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final urgent = secondsLeft < 30 && isMyTurn;
+    final urgent = secondsLeft < 60 && isMyTurn;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -278,44 +338,65 @@ class _PlayerPickTile extends StatelessWidget {
     required this.player,
     required this.isMyTurn,
     required this.picking,
+    required this.isPositionFull,
     required this.onPick,
   });
   final PlayerModel player;
   final bool isMyTurn;
   final bool picking;
+  final bool isPositionFull;
   final VoidCallback onPick;
+
+  bool get _isDST => player.positionLabel == 'NAT';
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: _posColor(player.positionLabel),
-        child: Text(player.positionLabel,
-            style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.bold)),
+        child: _isDST
+            ? const Icon(Icons.shield, color: Colors.white, size: 18)
+            : Text(player.positionLabel,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold)),
       ),
       title: Text(player.displayName,
           style: const TextStyle(fontWeight: FontWeight.w600)),
-      subtitle: Text(player.teamName,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-      trailing: isMyTurn
-          ? ElevatedButton(
-              onPressed: picking ? null : onPick,
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      subtitle: Text(
+        _isDST ? 'National Team · DST scoring' : player.teamName,
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      ),
+      trailing: isMyTurn && isPositionFull
+          ? Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(6),
               ),
-              child: picking
-                  ? const SizedBox(
-                      width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Pick'),
+              child: const Text('FULL',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textSecondary)),
             )
-          : Text('£${player.fantasyPrice.toStringAsFixed(0)}m',
-              style: const TextStyle(color: AppColors.textSecondary)),
+          : isMyTurn
+              ? ElevatedButton(
+                  onPressed: picking ? null : onPick,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: picking
+                      ? const SizedBox(
+                          width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Pick'),
+                )
+              : Text('£${player.fantasyPrice.toStringAsFixed(0)}m',
+                  style: const TextStyle(color: AppColors.textSecondary)),
     );
   }
 
@@ -324,8 +405,91 @@ class _PlayerPickTile extends StatelessWidget {
         'DEF' => const Color(0xFF43A047),
         'MID' => const Color(0xFFFB8C00),
         'FWD' => const Color(0xFFE53935),
+        'NAT' => const Color(0xFF7B1FA2),
         _ => AppColors.primary,
       };
+}
+
+// ── My squad slot tracker ─────────────────────────────────────────────────────
+
+class _MySquadStatus extends StatelessWidget {
+  const _MySquadStatus({required this.counts});
+  final Map<String, int> counts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: AppColors.surface,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          _SlotChip(pos: 'GK', filled: counts['GK'] ?? 0, max: kRequiredGK),
+          _SlotChip(pos: 'DEF', filled: counts['DEF'] ?? 0, max: kRequiredDEF),
+          _SlotChip(pos: 'MID', filled: counts['MID'] ?? 0, max: kRequiredMID),
+          _SlotChip(pos: 'FWD', filled: counts['FWD'] ?? 0, max: kRequiredFWD),
+          _SlotChip(pos: 'NAT', filled: counts['NAT'] ?? 0, max: 1),
+        ],
+      ),
+    );
+  }
+}
+
+class _SlotChip extends StatelessWidget {
+  const _SlotChip({required this.pos, required this.filled, required this.max});
+  final String pos;
+  final int filled;
+  final int max;
+
+  static Color _posColor(String pos) => switch (pos) {
+        'GK' => const Color(0xFF1E88E5),
+        'DEF' => const Color(0xFF43A047),
+        'MID' => const Color(0xFFFB8C00),
+        'FWD' => const Color(0xFFE53935),
+        'NAT' => const Color(0xFF7B1FA2),
+        _ => AppColors.primary,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final isFull = filled >= max;
+    final color = _posColor(pos);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(pos,
+            style: TextStyle(
+                fontSize: 10,
+                color: color,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5)),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(
+            max,
+            (i) => Container(
+              width: 10,
+              height: 10,
+              margin: const EdgeInsets.only(right: 2),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: i < filled ? color : color.withValues(alpha: 0.2),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$filled/$max',
+          style: TextStyle(
+              fontSize: 10,
+              color: isFull ? color : AppColors.textSecondary,
+              fontWeight: isFull ? FontWeight.bold : FontWeight.normal),
+        ),
+      ],
+    );
+  }
 }
 
 // ── Recent picks ticker ───────────────────────────────────────────────────────

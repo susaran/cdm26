@@ -63,8 +63,8 @@ class DraftRepository {
       'scheduledAt': Timestamp.fromDate(scheduledAt),
       'draftOrder': [],
       'currentPickIndex': 0,
-      'picksPerMember': kSquadTotal,
-      'pickDurationSeconds': 120,
+      'picksPerMember': kSquadTotal + 1, // 15 players + 1 national team (DST)
+      'pickDurationSeconds': 600,
       'draftedPlayerIds': [],
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -72,14 +72,22 @@ class DraftRepository {
 
   Future<void> startDraft(String leagueId, List<String> memberUserIds) async {
     final order = List<String>.from(memberUserIds)..shuffle(Random());
-    await _draftDoc(leagueId).update({
+    await _draftDoc(leagueId).set({
+      'leagueId': leagueId,
       'status': DraftStatus.active.name,
       'draftOrder': order,
       'startedAt': FieldValue.serverTimestamp(),
       'currentPickStartedAt': FieldValue.serverTimestamp(),
       'currentPickIndex': 0,
-    });
+      'picksPerMember': kSquadTotal + 1, // 15 players + 1 national team (DST)
+      'pickDurationSeconds': 600,
+      'draftedPlayerIds': [],
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
+
+  Future<void> updateSchedule(String leagueId, DateTime scheduledAt) =>
+      scheduleDraft(leagueId, scheduledAt);
 
   Future<void> makePick(
     String leagueId,
@@ -89,8 +97,9 @@ class DraftRepository {
   ) async {
     final batch = _db.batch();
     final pickNumber = pickIndex + 1;
+    final isDST = player.position == PlayerPosition.dst;
 
-    // 1. Record the pick
+    // 1. Record the pick in the picks log
     final pickRef = _picksCol(leagueId).doc();
     batch.set(pickRef, {
       'leagueId': leagueId,
@@ -103,27 +112,43 @@ class DraftRepository {
       'pickedAt': FieldValue.serverTimestamp(),
     });
 
-    // 2. Add player to the user's team
-    final slot = TeamPlayerSlot(
-      playerId: player.playerId,
-      position: player.positionLabel,
-      purchasePrice: 0,
-      displayName: player.displayName,
-      teamName: player.teamName,
-      countryCode: player.countryCode,
-      photoUrl: player.photoUrl,
-      slot: 'starter',
-    );
-    batch.set(
-      _teamDoc(leagueId, userId),
-      {
-        'leagueId': leagueId,
-        'userId': userId,
-        'players': FieldValue.arrayUnion([slot.toMap()]),
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    if (isDST) {
+      // 2a. DST/country pick — set the national team slot on the team doc
+      batch.set(
+        _teamDoc(leagueId, userId),
+        {
+          'leagueId': leagueId,
+          'userId': userId,
+          'teamPickId': player.playerId,
+          'teamPickName': player.displayName,
+          'teamPickCountryCode': player.countryCode,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    } else {
+      // 2b. Regular player pick — add to the players array
+      final slot = TeamPlayerSlot(
+        playerId: player.playerId,
+        position: player.positionLabel,
+        purchasePrice: 0,
+        displayName: player.displayName,
+        teamName: player.teamName,
+        countryCode: player.countryCode,
+        photoUrl: player.photoUrl,
+        slot: 'starter',
+      );
+      batch.set(
+        _teamDoc(leagueId, userId),
+        {
+          'leagueId': leagueId,
+          'userId': userId,
+          'players': FieldValue.arrayUnion([slot.toMap()]),
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    }
 
     // 3. Advance the draft state
     batch.update(_draftDoc(leagueId), {
@@ -145,5 +170,9 @@ class DraftRepository {
     await _draftDoc(leagueId).update({
       'status': DraftStatus.cancelled.name,
     });
+  }
+
+  Future<void> resetDraft(String leagueId) async {
+    await _draftDoc(leagueId).delete();
   }
 }

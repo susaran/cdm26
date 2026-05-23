@@ -38,8 +38,8 @@ class DraftLobbyScreen extends ConsumerWidget {
                 draft: draft,
                 userId: userId,
               ),
-            DraftStatus.completed => const _CompletedBanner(),
-            DraftStatus.cancelled => const _CancelledBanner(),
+            DraftStatus.completed => _CompletedBanner(leagueId: leagueId, userId: userId),
+            DraftStatus.cancelled => _CancelledBanner(leagueId: leagueId, userId: userId),
             DraftStatus.scheduled => _ScheduledState(
                 leagueId: leagueId,
                 draft: draft,
@@ -55,13 +55,20 @@ class DraftLobbyScreen extends ConsumerWidget {
 
 // ── No draft configured yet ──────────────────────────────────────────────────
 
-class _NoDraftState extends ConsumerWidget {
+class _NoDraftState extends ConsumerStatefulWidget {
   const _NoDraftState({required this.leagueId});
   final String leagueId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final leagueAsync = ref.watch(leagueByIdProvider(leagueId));
+  ConsumerState<_NoDraftState> createState() => _NoDraftStateState();
+}
+
+class _NoDraftStateState extends ConsumerState<_NoDraftState> {
+  bool _starting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final leagueAsync = ref.watch(leagueByIdProvider(widget.leagueId));
     final userId = ref.watch(authStateProvider).valueOrNull?.uid ?? '';
 
     return leagueAsync.when(
@@ -90,9 +97,25 @@ class _NoDraftState extends ConsumerWidget {
                 if (isOwner) ...[
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
+                    icon: _starting
+                        ? const SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.play_circle_filled),
+                    label: const Text('Draft Right Now'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 52),
+                      backgroundColor: AppColors.success,
+                    ),
+                    onPressed: _starting ? null : () => _startNow(context),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
                     icon: const Icon(Icons.schedule),
-                    label: const Text('Schedule Draft'),
-                    onPressed: () => _showSchedulePicker(context, ref),
+                    label: const Text('Schedule for Later'),
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 48)),
+                    onPressed: () => _showSchedulePicker(context),
                   ),
                 ],
               ],
@@ -103,8 +126,23 @@ class _NoDraftState extends ConsumerWidget {
     );
   }
 
-  Future<void> _showSchedulePicker(
-      BuildContext context, WidgetRef ref) async {
+  Future<void> _startNow(BuildContext context) async {
+    setState(() => _starting = true);
+    try {
+      final membersSnap = await FirebaseFirestore.instance
+          .collection('leagues')
+          .doc(widget.leagueId)
+          .collection('members')
+          .get();
+      final memberIds = membersSnap.docs.map((d) => d.id).toList();
+      await ref.read(draftRepositoryProvider).startDraft(widget.leagueId, memberIds);
+      if (context.mounted) context.go('/leagues/${widget.leagueId}/draft/room');
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  Future<void> _showSchedulePicker(BuildContext context) async {
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime.now().add(const Duration(days: 1)),
@@ -122,7 +160,7 @@ class _NoDraftState extends ConsumerWidget {
         date.year, date.month, date.day, time.hour, time.minute);
     await ref
         .read(draftRepositoryProvider)
-        .scheduleDraft(leagueId, scheduledAt);
+        .scheduleDraft(widget.leagueId, scheduledAt);
   }
 }
 
@@ -146,6 +184,7 @@ class _ScheduledState extends ConsumerStatefulWidget {
 
 class _ScheduledStateState extends ConsumerState<_ScheduledState> {
   late final _timer = Stream.periodic(const Duration(seconds: 1));
+  bool _starting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +194,7 @@ class _ScheduledStateState extends ConsumerState<_ScheduledState> {
         final now = DateTime.now();
         final scheduled = widget.draft.scheduledAt;
         final diff = scheduled != null ? scheduled.difference(now) : Duration.zero;
-        final canStart = diff.isNegative || diff.inSeconds < 60;
+        final atScheduledTime = diff.isNegative || diff.inSeconds < 60;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -220,27 +259,47 @@ class _ScheduledStateState extends ConsumerState<_ScheduledState> {
                   }
                   return Column(
                     children: [
+                      // Start button — always enabled for owner
                       ElevatedButton.icon(
-                        icon: const Icon(Icons.play_arrow),
-                        label: const Text('Start Draft Now'),
+                        icon: _starting
+                            ? const SizedBox(
+                                width: 18, height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.play_arrow),
+                        label: Text(atScheduledTime
+                            ? 'Start Draft Now'
+                            : 'Start Early'),
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 52),
                           backgroundColor: AppColors.success,
                         ),
-                        onPressed: canStart
-                            ? () => _startDraft(context, ref, league!)
-                            : null,
+                        onPressed:
+                            _starting ? null : () => _startDraft(context),
                       ),
-                      if (!canStart)
+                      if (!atScheduledTime)
                         const Padding(
-                          padding: EdgeInsets.only(top: 8),
+                          padding: EdgeInsets.only(top: 6),
                           child: Text(
-                            'Available when the scheduled time is reached.',
+                            'Scheduled time not yet reached — starts early.',
                             style: TextStyle(
                                 color: AppColors.textSecondary, fontSize: 12),
                             textAlign: TextAlign.center,
                           ),
                         ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        icon: const Icon(Icons.edit_calendar, size: 18),
+                        label: const Text('Edit Schedule'),
+                        onPressed: () => _editSchedule(context),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.cancel_outlined, size: 18),
+                        label: const Text('Cancel Draft'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: AppColors.error),
+                        onPressed: () => _cancelDraft(context),
+                      ),
                     ],
                   );
                 },
@@ -252,18 +311,70 @@ class _ScheduledStateState extends ConsumerState<_ScheduledState> {
     );
   }
 
-  Future<void> _startDraft(BuildContext context, WidgetRef ref, dynamic league) async {
-    final membersSnap = await FirebaseFirestore.instance
-        .collection('leagues')
-        .doc(widget.leagueId)
-        .collection('members')
-        .get();
-    final memberIds = membersSnap.docs.map((d) => d.id).toList();
-
-    await ref.read(draftRepositoryProvider).startDraft(widget.leagueId, memberIds);
-    if (context.mounted) {
-      context.go('/leagues/${widget.leagueId}/draft/room');
+  Future<void> _startDraft(BuildContext context) async {
+    setState(() => _starting = true);
+    try {
+      final membersSnap = await FirebaseFirestore.instance
+          .collection('leagues')
+          .doc(widget.leagueId)
+          .collection('members')
+          .get();
+      final memberIds = membersSnap.docs.map((d) => d.id).toList();
+      await ref
+          .read(draftRepositoryProvider)
+          .startDraft(widget.leagueId, memberIds);
+      if (context.mounted) {
+        context.go('/leagues/${widget.leagueId}/draft/room');
+      }
+    } finally {
+      if (mounted) setState(() => _starting = false);
     }
+  }
+
+  Future<void> _cancelDraft(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Scheduled Draft?'),
+        content: const Text(
+            'This removes the scheduled draft. You can schedule a new one afterwards.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Cancel Draft'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    await ref.read(draftRepositoryProvider).resetDraft(widget.leagueId);
+  }
+
+  Future<void> _editSchedule(BuildContext context) async {
+    final initial = widget.draft.scheduledAt ?? DateTime.now().add(const Duration(days: 1));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2026, 6, 10),
+    );
+    if (date == null || !context.mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: initial.hour, minute: initial.minute),
+    );
+    if (time == null || !context.mounted) return;
+
+    final scheduledAt =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    await ref
+        .read(draftRepositoryProvider)
+        .updateSchedule(widget.leagueId, scheduledAt);
   }
 }
 
@@ -338,7 +449,8 @@ class _RulesCard extends StatelessWidget {
               ('🐍', 'Snake draft format — order reverses each round'),
               ('⏱️', '2 minutes per pick'),
               ('🚫', 'Once picked, a player is locked to that team'),
-              ('👥', '15 players per squad: 2 GK · 5 DEF · 5 MID · 3 FWD'),
+              ('👥', '15 picks: 14 players (2 GK · 4 DEF · 4 MID · 4 FWD) + 1 National Team'),
+              ('⚽', 'Lineup: 1 GK + 1 NAT + 3–5 DEF + 2–4 MID + 1–3 FWD (11 starters + 4 bench)'),
               ('💰', 'No salary cap — draft freely'),
               ('🔁', 'Trades open after the draft, until the semifinals'),
             ].map((r) => Padding(
@@ -414,37 +526,83 @@ class _ActiveDraftBanner extends StatelessWidget {
   }
 }
 
-class _CompletedBanner extends StatelessWidget {
-  const _CompletedBanner();
+class _CompletedBanner extends ConsumerWidget {
+  const _CompletedBanner({required this.leagueId, required this.userId});
+  final String leagueId;
+  final String userId;
+
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final leagueAsync = ref.watch(leagueByIdProvider(leagueId));
+    final isOwner = leagueAsync.valueOrNull?.ownerUserId == userId;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_outline, size: 72, color: AppColors.success),
-            SizedBox(height: 16),
-            Text('Draft Complete!',
+            const Icon(Icons.check_circle_outline,
+                size: 72, color: AppColors.success),
+            const SizedBox(height: 16),
+            const Text('Draft Complete!',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('All teams have been drafted.',
+            const SizedBox(height: 8),
+            const Text('All teams have been drafted.',
                 style: TextStyle(color: AppColors.textSecondary)),
+            if (isOwner) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Reset Draft (Testing)'),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error)),
+                onPressed: () => ref
+                    .read(draftRepositoryProvider)
+                    .resetDraft(leagueId),
+              ),
+            ],
           ],
         ),
-      );
+      ),
+    );
+  }
 }
 
-class _CancelledBanner extends StatelessWidget {
-  const _CancelledBanner();
+class _CancelledBanner extends ConsumerWidget {
+  const _CancelledBanner({required this.leagueId, required this.userId});
+  final String leagueId;
+  final String userId;
+
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final leagueAsync = ref.watch(leagueByIdProvider(leagueId));
+    final isOwner = leagueAsync.valueOrNull?.ownerUserId == userId;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.cancel_outlined, size: 72, color: AppColors.error),
-            SizedBox(height: 16),
-            Text('Draft Cancelled',
+            const Icon(Icons.cancel_outlined, size: 72, color: AppColors.error),
+            const SizedBox(height: 16),
+            const Text('Draft Cancelled',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            if (isOwner) ...[
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Schedule New Draft'),
+                style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 52)),
+                onPressed: () => ref
+                    .read(draftRepositoryProvider)
+                    .resetDraft(leagueId),
+              ),
+            ],
           ],
         ),
-      );
+      ),
+    );
+  }
 }

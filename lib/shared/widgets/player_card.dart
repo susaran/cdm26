@@ -86,5 +86,6 @@ class PlayerCard extends StatelessWidget {
         PlayerPosition.def => AppColors.defColor,
         PlayerPosition.mid => AppColors.midColor,
         PlayerPosition.fwd => AppColors.fwdColor,
+        PlayerPosition.dst => const Color(0xFF7B1FA2),
       };
 }
