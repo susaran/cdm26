@@ -27,98 +27,119 @@ class _LeagueScreenState extends ConsumerState<LeagueScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollCtrl) => Column(
           children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(league.name,
                   style: const TextStyle(
                       fontWeight: FontWeight.bold, fontSize: 16)),
             ),
             const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.leaderboard),
-              title: const Text('Leaderboard'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/leagues/${league.leagueId}/leaderboard');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline,
-                  color: AppColors.accent),
-              title: const Text('Messages'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/leagues/${league.leagueId}/inbox');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sports_esports),
-              title: const Text('Draft Room'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/leagues/${league.leagueId}/draft');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.group),
-              title: const Text('Build Squad'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/leagues/${league.leagueId}/team');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.swap_horiz),
-              title: const Text('Trades'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/leagues/${league.leagueId}/trades');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sports_soccer),
-              title: const Text('Predictions'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/leagues/${league.leagueId}/predictions');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.edit, color: AppColors.secondary),
-              title: const Text('Edit Team Name & Badge'),
-              onTap: () {
-                Navigator.pop(context);
-                showTeamIdentitySheet(context, ref, league.leagueId);
-              },
-            ),
-            if (isAdmin) ...[
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(Icons.image_outlined,
-                    color: AppColors.textSecondary),
-                title: const Text('Change League Photo'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _changeLeaguePhoto(context, league.leagueId);
-                },
+            Expanded(
+              child: ListView(
+                controller: scrollCtrl,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.leaderboard),
+                    title: const Text('Leaderboard'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leagues/${league.leagueId}/leaderboard');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.chat_bubble_outline,
+                        color: AppColors.accent),
+                    title: const Text('Messages'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leagues/${league.leagueId}/inbox');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.sports_esports),
+                    title: const Text('Draft Room'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leagues/${league.leagueId}/draft');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.group),
+                    title: const Text('Build Squad'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leagues/${league.leagueId}/team');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.swap_horiz),
+                    title: const Text('Trades'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leagues/${league.leagueId}/trades');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.sports_soccer),
+                    title: const Text('Predictions'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/leagues/${league.leagueId}/predictions');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.edit, color: AppColors.secondary),
+                    title: const Text('Edit Team Name & Badge'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      showTeamIdentitySheet(context, ref, league.leagueId);
+                    },
+                  ),
+                  if (isAdmin) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.image_outlined,
+                          color: AppColors.textSecondary),
+                      title: const Text('Change League Photo'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _changeLeaguePhoto(context, league.leagueId);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.delete_forever,
+                          color: AppColors.error),
+                      title: const Text('Delete League',
+                          style: TextStyle(color: AppColors.error)),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _confirmDelete(context, league);
+                      },
+                    ),
+                  ],
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.delete_forever,
-                    color: AppColors.error),
-                title: const Text('Delete League',
-                    style: TextStyle(color: AppColors.error)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmDelete(context, league);
-                },
-              ),
-            ],
+            ),
           ],
         ),
       ),

@@ -23,8 +23,11 @@ class FcmService {
       sound: true,
     );
 
-    final token = await messaging.getToken();
-    if (token != null) await _storeToken(token);
+    // getToken() throws on the iOS simulator (no APNS token); ignore it
+    try {
+      final token = await messaging.getToken();
+      if (token != null) await _storeToken(token);
+    } catch (_) {}
 
     // Refresh token whenever it rotates
     messaging.onTokenRefresh.listen(_storeToken);

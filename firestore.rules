@@ -127,6 +127,24 @@ service cloud.firestore {
         );
         allow delete: if false;
       }
+
+      // Chat threads — readable/writable by league members who are participants
+      match /chats/{threadId} {
+        allow read: if isLeagueMember(leagueId);
+        allow create: if isLeagueMember(leagueId);
+        allow update: if isLeagueMember(leagueId) &&
+          request.auth.uid in resource.data.participantIds;
+        allow delete: if false;
+
+        match /messages/{messageId} {
+          allow read: if isLeagueMember(leagueId) &&
+            request.auth.uid in get(/databases/$(database)/documents/leagues/$(leagueId)/chats/$(threadId)).data.participantIds;
+          allow create: if isLeagueMember(leagueId) &&
+            request.auth.uid in get(/databases/$(database)/documents/leagues/$(leagueId)/chats/$(threadId)).data.participantIds &&
+            request.resource.data.senderId == request.auth.uid;
+          allow update, delete: if false;
+        }
+      }
     }
 
     // collectionGroup query for members (used to find all leagues a user belongs to)
