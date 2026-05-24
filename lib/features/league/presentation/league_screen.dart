@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/loading_widget.dart';
@@ -97,7 +100,17 @@ class _LeagueScreenState extends ConsumerState<LeagueScreen> {
             if (isAdmin) ...[
               const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.delete_forever, color: AppColors.error),
+                leading: const Icon(Icons.image_outlined,
+                    color: AppColors.textSecondary),
+                title: const Text('Change League Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _changeLeaguePhoto(context, league.leagueId);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_forever,
+                    color: AppColors.error),
                 title: const Text('Delete League',
                     style: TextStyle(color: AppColors.error)),
                 onTap: () {
@@ -110,6 +123,22 @@ class _LeagueScreenState extends ConsumerState<LeagueScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _changeLeaguePhoto(
+      BuildContext context, String leagueId) async {
+    final picker = ImagePicker();
+    final xfile = await picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 512, imageQuality: 80);
+    if (xfile == null) return;
+    await ref
+        .read(leagueRepositoryProvider)
+        .uploadLeagueAvatar(leagueId, File(xfile.path));
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('League photo updated')),
+      );
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, LeagueModel league) async {

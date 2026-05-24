@@ -139,6 +139,15 @@ class LeagueRepository {
     return LeagueModel.fromFirestore(doc);
   }
 
+  Future<String?> uploadLeagueAvatar(
+      String leagueId, File imageFile) async {
+    final ref = FirebaseStorage.instance.ref('leagues/$leagueId/avatar.jpg');
+    await ref.putFile(imageFile);
+    final url = await ref.getDownloadURL();
+    await _leagues.doc(leagueId).update({'avatarUrl': url});
+    return url;
+  }
+
   Future<String?> uploadTeamBadge(
       String leagueId, String userId, File imageFile) async {
     final ref = FirebaseStorage.instance

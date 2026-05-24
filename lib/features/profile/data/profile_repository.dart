@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:riverpod/riverpod.dart' show Ref;
 import 'package:uuid/uuid.dart';
@@ -52,6 +56,22 @@ class ProfileRepository {
       'photoUrl': photoUrl,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<String> uploadProfilePhoto(String userId, File imageFile) async {
+    final ref = FirebaseStorage.instance.ref('users/$userId/avatar.jpg');
+    await ref.putFile(imageFile);
+    final url = await ref.getDownloadURL();
+    // Update Firestore and Firebase Auth display photo in parallel
+    await Future.wait([
+      _users.doc(userId).update({
+        'photoUrl': url,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }),
+      FirebaseAuth.instance.currentUser?.updatePhotoURL(url) ??
+          Future.value(),
+    ]);
+    return url;
   }
 
   Future<void> updateFcmToken(String userId, String token) async {
