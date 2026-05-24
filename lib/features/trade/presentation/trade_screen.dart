@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/loading_widget.dart';
 import '../../auth/presentation/auth_provider.dart';
+import '../../chat/data/chat_repository.dart';
+import '../../chat/domain/chat_message_model.dart';
 import '../../league/presentation/league_provider.dart';
 import '../../team_builder/presentation/team_provider.dart';
 import '../data/trade_repository.dart';
@@ -264,9 +267,25 @@ class _TradeTile extends ConsumerWidget {
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.error),
-                      onPressed: () => ref
-                          .read(tradeRepositoryProvider)
-                          .rejectTrade(leagueId, trade.tradeId),
+                      onPressed: () async {
+                        await ref
+                            .read(tradeRepositoryProvider)
+                            .rejectTrade(leagueId, trade.tradeId);
+                        final threadId = 'trade_${trade.tradeId}';
+                        await ref
+                            .read(chatRepositoryProvider)
+                            .postSystemMessage(
+                              leagueId: leagueId,
+                              threadId: threadId,
+                              senderId: userId,
+                              senderName: trade.targetDisplayName,
+                              text:
+                                  '${trade.targetDisplayName} rejected the trade. ❌',
+                              type: MessageType.tradeRejected,
+                              tradeId: trade.tradeId,
+                            )
+                            .catchError((_) {});
+                      },
                       child: const Text('Reject'),
                     ),
                   ),
@@ -275,9 +294,26 @@ class _TradeTile extends ConsumerWidget {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.success),
-                      onPressed: () => ref
-                          .read(tradeRepositoryProvider)
-                          .acceptTrade(leagueId, trade),
+                      onPressed: () async {
+                        await ref
+                            .read(tradeRepositoryProvider)
+                            .acceptTrade(leagueId, trade);
+                        // Post system message to trade thread
+                        final threadId = 'trade_${trade.tradeId}';
+                        await ref
+                            .read(chatRepositoryProvider)
+                            .postSystemMessage(
+                              leagueId: leagueId,
+                              threadId: threadId,
+                              senderId: userId,
+                              senderName: trade.targetDisplayName,
+                              text:
+                                  '${trade.targetDisplayName} accepted the trade! ✅',
+                              type: MessageType.tradeAccepted,
+                              tradeId: trade.tradeId,
+                            )
+                            .catchError((_) {});
+                      },
                       child: const Text('Accept'),
                     ),
                   ),
@@ -291,10 +327,46 @@ class _TradeTile extends ConsumerWidget {
                     .cancelTrade(leagueId, trade.tradeId),
                 child: const Text('Cancel Trade'),
               ),
+            // Chat button — always visible on pending trades
+            if (trade.isPending) ...[
+              const Divider(height: 16),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Chat about this trade'),
+                style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 36)),
+                onPressed: () => _openTradeChat(context, ref),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _openTradeChat(BuildContext context, WidgetRef ref) async {
+    final proposerName = trade.proposerDisplayName;
+    final targetName = trade.targetDisplayName;
+    final summary = _tradeSummary();
+    final threadId = await ref
+        .read(chatRepositoryProvider)
+        .getOrCreateTradeThread(
+          leagueId: leagueId,
+          tradeId: trade.tradeId,
+          proposerId: trade.proposerId,
+          proposerName: proposerName,
+          targetId: trade.targetUserId,
+          targetName: targetName,
+          systemMessage: summary,
+        );
+    if (!context.mounted) return;
+    context.go('/leagues/$leagueId/inbox/$threadId');
+  }
+
+  String _tradeSummary() {
+    final offered = trade.offeredPlayers.map((p) => p.displayName).join(', ');
+    final wanted = trade.requestedPlayers.map((p) => p.displayName).join(', ');
+    return '${trade.proposerDisplayName} offers $offered for $wanted';
   }
 }
 
@@ -571,6 +643,11 @@ class _ProposeTradeTabState extends ConsumerState<_ProposeTradeTab> {
           _messageCtrl.clear();
         });
       }
+
+      // The Cloud Function will handle the FCM notification; we just
+      // ensure the trade thread exists so the chat button works immediately.
+      // (tradeId is not returned from proposeTrade, so thread creation
+      //  is deferred to first time user taps "Chat about this trade")
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

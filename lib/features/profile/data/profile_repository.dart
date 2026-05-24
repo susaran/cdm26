@@ -54,6 +54,13 @@ class ProfileRepository {
     });
   }
 
+  Future<void> updateFcmToken(String userId, String token) async {
+    await _users.doc(userId).update({
+      'fcmToken': token,
+      'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   String _generateUsername(String displayName) {
     final base = displayName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
     final suffix = const Uuid().v4().substring(0, 4);

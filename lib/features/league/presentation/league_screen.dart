@@ -46,6 +46,15 @@ class _LeagueScreenState extends ConsumerState<LeagueScreen> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.chat_bubble_outline,
+                  color: AppColors.accent),
+              title: const Text('Messages'),
+              onTap: () {
+                Navigator.pop(context);
+                context.go('/leagues/${league.leagueId}/inbox');
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.sports_esports),
               title: const Text('Draft Room'),
               onTap: () {

@@ -6,7 +6,7 @@ admin.initializeApp();
 
 export { syncMatchData, syncAllFixtures } from "./data_sync/api_football_sync";
 export { calculateMatchScores, recalculateMatch } from "./scoring/scoring_engine";
-export { onMatchFinished, onGoalScored } from "./notifications/notification_triggers";
+export { onMatchFinished, onGoalScored, onTradeProposed, onNewChatMessage } from "./notifications/notification_triggers";
 
 // One-time admin seed — call via: curl -X POST <fn_url>?secret=cdm26seed
 export const seedData = functions.https.onRequest(async (req, res) => {

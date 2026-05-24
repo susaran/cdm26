@@ -10,6 +10,8 @@ import '../../features/draft/presentation/draft_room_screen.dart';
 import '../../features/league/presentation/create_league_screen.dart';
 import '../../features/league/presentation/join_league_screen.dart';
 import '../../features/league/presentation/league_screen.dart';
+import '../../features/chat/presentation/chat_thread_screen.dart';
+import '../../features/chat/presentation/inbox_screen.dart';
 import '../../features/leaderboard/presentation/leaderboard_screen.dart';
 import '../../features/matches/presentation/fixtures_screen.dart';
 import '../../features/matches/presentation/match_center_screen.dart';
@@ -109,6 +111,20 @@ GoRouter appRouter(Ref ref) {
                 path: ':leagueId/trades',
                 builder: (_, state) => TradeScreen(
                     leagueId: state.pathParameters['leagueId']!),
+              ),
+              GoRoute(
+                path: ':leagueId/inbox',
+                builder: (_, state) => InboxScreen(
+                    leagueId: state.pathParameters['leagueId']!),
+                routes: [
+                  GoRoute(
+                    path: ':threadId',
+                    builder: (_, state) => ChatThreadScreen(
+                      leagueId: state.pathParameters['leagueId']!,
+                      threadId: state.pathParameters['threadId']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
